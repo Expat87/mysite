@@ -1,0 +1,234 @@
+{% extends 'website/base.html' %}
+{% load static %}
+<script src="{% static 'engapp.js' %}"></script>
+{% block content %}
+<h1> Flange Estimating </h1>
+<h4> Intended for use where Piping Standard ASME B31.3 code is applicable </h4></br>
+
+<div class="container">
+    <form id="designForm">
+        <div class="form-group">
+            <label for="inputDesignTemp">Enter Design Temperature (degC)</label>
+            <input type="text" class="form-control" id="inputDesignTemp" placeholder="{{DT}} degC">
+        </div>
+        <div class="form-group">
+            <label for="inputDesignPress">Enter Design Pressure (barg)</label>
+            <input type="text" class="form-control" id="inputDesignPress" placeholder="{{DP}} barg">
+        </div><br/>
+        <button type="submit" class="btn btn-outline-secondary">OK</button>
+    </form>
+</div>
+
+<br/><br/>
+<div class="d-inline-block">
+<table id="pipe_data_flange" class="table table-hover table-bordered border-dark">
+<thead>
+  <tr>
+  <th></th>
+  <th scope="col" colspan="7" style="text-align: center">MAX DESIGN PRESSURE (BARG)</th>
+  </tr>
+  <tr>
+    <th style="text-align: right">Material / Flange Rating #</th>
+    {% for flange in unique_flange_ratings %}
+    <th>{{flange}}</th>
+    {% endfor %}
+   </tr>
+</thead>
+<tbody>
+  {% for material, value in organised_flange_data.items %}
+    <tr>
+      <td>{{ material }}</td>
+      {% for flange, data in value.items %}
+        {% if data.allowable %}
+          <td class="table-success border-dark" style="min-width: 75px !important;">{{ data.max_p|floatformat:"1" }}</td>
+        {% else %}
+          <td class="table-danger border-dark" style="min-width: 75px !important;">{{ data.max_p|floatformat:"1" }}</td>
+        {% endif %}
+      {% endfor %}
+    </tr>
+  {% endfor %}
+</tbody>
+</table>
+</div>
+</br>
+{% endblock %}
+
+
+
+js:
+
+document.getElementById('designForm').addEventListener('submit', function(event) {
+    event.preventDefault();
+    
+    const designTemp = document.getElementById('inputDesignTemp').value;
+    const designPress = document.getElementById('inputDesignPress').value;
+
+    fetch('/pipe_data_flange/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')  // Ensure you include the CSRF token
+        },
+        body: JSON.stringify({
+            design_temp: designTemp,
+            design_press: designPress
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        updateTable(data);
+    })
+    .catch(error => console.error('Error:', error));
+});
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function updateTable(data) {
+    const tableBody = document.querySelector('#pipe_data_flange tbody');
+    tableBody.innerHTML = '';  // Clear existing table data
+
+    for (const [material, value] of Object.entries(data.organised_flange_data)) {
+        const row = document.createElement('tr');
+        const materialCell = document.createElement('td');
+        materialCell.textContent = material;
+        row.appendChild(materialCell);
+
+        for (const flange of data.unique_flange_ratings) {
+            const cell = document.createElement('td');
+            const spec = value[flange];
+            if (spec) {
+                cell.textContent = spec.max_p.toFixed(1);
+                cell.className = spec.allowable ? 'table-success border-dark' : 'table-danger border-dark';
+            } else {
+                cell.textContent = '-';
+            }
+            cell.style.minWidth = '75px';
+            row.appendChild(cell);
+        }
+
+        tableBody.appendChild(row);
+    }
+}
+
+
+view
+
+from django.shortcuts import render
+from django.http import JsonResponse
+import json
+from .models import FlangeRating
+from .utils import parse_list_from_string, calc_max_p  # Ensure you import your utility functions
+
+def pipe_data_flange(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        DT = data.get('design_temp')
+        DP = data.get('design_press')
+        print(DT, DP)
+        
+        # Ensure DT and DP are valid numbers
+        try:
+            DT = float(DT)
+            DP = float(DP)
+        except (TypeError, ValueError):
+            return JsonResponse({'error': 'Invalid input'}, status=400)
+
+        # Your existing logic to calculate flange data
+        flange_ratings = FlangeRating.objects.all()
+        flange_data = []
+        flange_ratings_set = set()
+        for item in flange_ratings:
+            max_pressure = parse_list_from_string(item.max_pressure)
+            temp_range = parse_list_from_string(item.temp_range)
+            pipe_class = {
+                "material": item.material,
+                "flange_rating": item.flange_rating,
+                "max_p": max_pressure,
+                "temp_range": temp_range
+            }
+            flange_data.append(pipe_class)
+            flange_ratings_set.add(int(item.flange_rating))
+
+        unique_flange_ratings = sorted(flange_ratings_set)
+        flange_rating_list = calc_max_p(flange_data, DT, DP)
+
+        organised_flange_data = {}
+        for spec in flange_rating_list:
+            material = spec['material']
+            flange_rating = spec['flange_rating']
+            if material not in organised_flange_data:
+                organised_flange_data[material] = {}
+            organised_flange_data[material][flange_rating] = {
+                'max_p': spec['calculated_max_p'],
+                'design_t': DT,
+                'allowable': spec['acceptable']
+            }
+
+        return JsonResponse({
+            'organised_flange_data': organised_flange_data,
+            'unique_flange_ratings': unique_flange_ratings,
+            'DT': DT,
+            'DP': DP,
+        })
+
+    else:
+        flange_ratings = FlangeRating.objects.all()
+
+        # Save data to a list of dictionaries
+        flange_data = []
+        flange_ratings_set = set()
+        for item in flange_ratings:
+            max_pressure = parse_list_from_string(item.max_pressure)
+            temp_range = parse_list_from_string(item.temp_range)
+            pipe_class = {
+                "material": item.material,
+                "flange_rating": item.flange_rating,
+                "max_p": max_pressure,
+                "temp_range": temp_range
+            }
+            # Add to flange_data list
+            flange_data.append(pipe_class)
+            # Add to set of unique flange ratings
+            flange_ratings_set.add(int(item.flange_rating))
+
+        # Convert set to sorted list
+        unique_flange_ratings = sorted(flange_ratings_set)
+        
+        # User Input DP & DT
+        DT = 230  # deg C
+        DP = 54  # barg
+
+        flange_rating_list = calc_max_p(flange_data, DT, DP)
+
+        # Organise data by material and flange rating
+        organised_flange_data = {}
+        for spec in flange_rating_list:
+            material = spec['material']
+            flange_rating = spec['flange_rating']
+            if material not in organised_flange_data:
+                organised_flange_data[material] = {}
+            organised_flange_data[material][flange_rating] = {
+                'max_p': spec['calculated_max_p'],
+                'design_t': DT,
+                'allowable': spec['acceptable']
+            }
+
+        return render(request, 'website/pipe_data_flange.html', {
+            'organised_flange_data': organised_flange_data,
+            'unique_flange_ratings': unique_flange_ratings,
+            'DT': DT,
+            'DP': DP,
+        })

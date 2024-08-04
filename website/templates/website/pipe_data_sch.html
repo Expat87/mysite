@@ -1,0 +1,50 @@
+{% extends 'website/base.html' %}
+{% block content %}
+<h1> Welded and Seamless Wrought Steel Pipe </h1>
+<h4> ASME B36.10M-2018 </h4></br>
+
+<label>Select Pipe Size (DN):
+<select id="pipeFilter">
+    <option value="">Select</option>
+	
+    <!-- Add your areas here -->
+{% for pipe in asme_pipe|dictsort:'dn' %}
+    {% ifchanged %}
+        <option value="{{ pipe.dn }}">{{ pipe.dn }}</option>
+    {% endifchanged %}
+{% endfor %}
+    <!-- etc. -->
+</select>
+</label>
+<table id="pipe_data" class="table table-hover table-striped table-bordered ">
+<thead>
+  <tr>
+	<th>DN (mm)</th>
+	<th>NPS (inch)</th>
+	<th>Schedule</th>
+	<th>OD (mm)</th>		
+	<th>ID (mm)</th>
+	<th>Wall Thickness (mm)</th>
+	<th>XSA (mm2)</th>			
+	<th>Mass (kg/m)</th>				
+   </tr>
+</thead>
+<tbody>
+	{% for pipe in asme_pipe %}
+	  <tr>
+	  <td> {{ pipe.dn}}</td>
+	  <td> {{ pipe.nps}} </td>	
+	  <td> {{ pipe.sch}} </td>
+	  <td> {{ pipe.od}}</td>
+	  <td> {{ pipe.id_calc|floatformat:1}} </td>
+	  <td> {{ pipe.wt}}  </td>				  
+	  <td> {{ pipe.xsa_calc|floatformat:1}} </td>  	
+	  <td> {{ pipe.mass}} </td>  
+  	</tr>
+  {% endfor %}
+
+</tbody>
+</table>
+</br>
+<!---->
+{% endblock %}
