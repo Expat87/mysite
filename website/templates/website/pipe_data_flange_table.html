@@ -1,0 +1,40 @@
+<table id="pipe_data_flange" class="table table-hover table-bordered border-dark">
+    <thead>
+        <tr>
+            <th></th>
+            <th scope="col" colspan="7" style="text-align: center">MAX DESIGN PRESSURE (BARG)</th>
+        </tr>
+        <tr>
+            <th style="text-align: right">Material / Flange Rating #</th>
+            {% for flange in unique_flange_ratings %}
+                <th>{{ flange }}</th>
+            {% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for material, value in organised_flange_data.items %}
+            <tr>
+                <td>{{ material }}</td>
+                {% for flange, data in value.items %}
+                    {% if data.allowable %}
+                        <td class="table-success border-dark" style="min-width: 75px !important;">{{ data.max_p|floatformat:"1" }}</td>
+                    {% else %}
+                        <td class="table-danger border-dark" style="min-width: 75px !important;">{{ data.max_p|floatformat:"1" }}</td>
+                    {% endif %}
+                {% endfor %}
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</br>
+<p><strong>Legend:</strong></p>
+<table class="table table-hover table-bordered border-dark" style="width: auto">
+<tbody>    
+    <tr>
+        <td class="table-success border-dark"><strong>Acceptable</strong></td>
+    </tr>
+    <tr>
+        <td class="table-danger border-dark"><strong>Not Acceptable</strong></td>
+    </tr>
+</tbody>
+</table>

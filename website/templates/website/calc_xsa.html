@@ -1,0 +1,40 @@
+{% extends 'website/base.html' %}
+{% block content %}
+<h1>Calculate Pipe Cross Sectional Area</h1>
+<h4></h4></br>
+
+<form id="pipeForm" method="POST" action="">
+    {% csrf_token %}
+    <div class="container">
+        <div class="form-group">
+            <label for="inputDia">Enter Pipe Inner Diameter (mm)</label>
+            <input type="text" class="form-control" id="inputDia" name="inputDia" placeholder="Enter diameter" value="{{ dia|default_if_none:'' }}">
+        </div><br/>
+        <input type="submit" value="Calculate" class="btn btn-outline-secondary">
+    </div>
+</form>
+
+<p id="result">Pipe Cross Sectional Area: {{ pipeXSA }} mm²</p>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script>
+$(document).ready(function() {
+    $('#pipeForm').on('submit', function(e) {
+        e.preventDefault(); // Prevent the form from submitting the traditional way
+
+        $.ajax({
+            type: 'POST',
+            url: $(this).attr('action'),
+            data: $(this).serialize(),
+            success: function(response) {
+                $('#result').text('Pipe Cross Sectional Area: ' + response.pipeXSA + ' mm²');
+            },
+            error: function(xhr, errmsg, err) {
+                console.log(xhr.status + ": " + xhr.responseText);
+            }
+        });
+    });
+});
+</script>
+
+{% endblock %}

@@ -1,123 +1,49 @@
 {% extends 'website/base.html' %}
-{% load static %}
-<script src="{% static 'engapp.js' %}"></script>
-<script>
-document.getElementById('designForm').addEventListener('submit', function(event) {
-    event.preventDefault();
-    
-    const designTemp = document.getElementById('inputDesignTemp').value;
-    const designPress = document.getElementById('inputDesignPress').value;
-
-    fetch('/your-django-endpoint/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')  // Ensure you include the CSRF token
-        },
-        body: JSON.stringify({
-            design_temp: designTemp,
-            design_press: designPress
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        updateTable(data);
-    })
-    .catch(error => console.error('Error:', error));
-});
-
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-function updateTable(data) {
-    const tableBody = document.querySelector('#pipe_data_flange tbody');
-    tableBody.innerHTML = '';  // Clear existing table data
-
-    for (const [material, value] of Object.entries(data.organised_flange_data)) {
-        const row = document.createElement('tr');
-        const materialCell = document.createElement('td');
-        materialCell.textContent = material;
-        row.appendChild(materialCell);
-
-        for (const flange of data.unique_flange_ratings) {
-            const cell = document.createElement('td');
-            const spec = value[flange];
-            if (spec) {
-                cell.textContent = spec.max_p.toFixed(1);
-                cell.className = spec.allowable ? 'table-success border-dark' : 'table-danger border-dark';
-            } else {
-                cell.textContent = '-';
-            }
-            cell.style.minWidth = '75px';
-            row.appendChild(cell);
-        }
-
-        tableBody.appendChild(row);
-    }
-}
-
-</script>
 {% block content %}
 
-<h1> Flange Estimating </h1>
-<h4> Intended for use where Piping Standard ASME B31.3 code is applicable </h4></br>
+<h1>Flange Estimating</h1>
+<h4>Intended for use where Piping Standard ASME B31.3 code is applicable</h4></br>
 
 <div class="container">
-<form id="designForm" >
-    <div class="form-group">
-        <label for="inputDesignTemp">Enter Design Temperature (°C)</label>
-        <input type="text" class="form-control" id="inputDesignTemp" placeholder="{{DT}}°C">
+    <form id="designForm" method="POST" action="">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="inputDesignTemp">Enter Design Temperature (°C)</label>
+            <input type="text" class="form-control" id="inputDesignTemp" name="inputDesignTemp" placeholder="{{ DT }}°C" style="max-width: 300px;">
+        </div>
+        <div class="form-group">
+            <label for="inputDesignPress">Enter Design Pressure (barg)</label>
+            <input type="text" class="form-control" id="inputDesignPress" name="inputDesignPress" placeholder="{{ DP }} barg" style="max-width: 300px;">
+        </div><br/>
+        <button type="submit" class="btn btn-outline-secondary">Calculate</button>
+    </form>
+
+    <br/><br/>
+    <div id="flangeTableContainer" class="d-inline-block">
+        <!-- The table will be updated via JavaScript -->
     </div>
-    <div class="form-group">
-        <label for="inputDesignPress">Enter Design Pressure (barg)</label>
-        <input type="text" class="form-control" id="inputDesignPress" placeholder="{{DP}} barg">
-    </div><br/>
-    <button type="submit" class="btn btn-outline-secondary">OK</button>
-</form>
-
-
-<br/><br/>
-<div class="d-inline-block">
-<table id="pipe_data_flange" class="table table-hover table-bordered  border-dark">
-<thead>
-  <tr>
-  <th></th>
-  <th scope="col" colspan="7" style="text-align: center">MAX DESIGN PRESSURE (BARG)</th>
-  </tr>
-  <tr>
-	<th style="text-align: right">Material / Flange Rating #</th>
-	{% for flange in unique_flange_ratings %}
-	<th>{{flange}}</th>
-	{%endfor%}	
-   </tr>
-</thead>
-<tbody>
-  {% for material, value in organised_flange_data.items %}
-    <tr>
-      <td>{{ material }}</td>
-      {% for flange, data in value.items %}
-		{% if data.allowable %}
-          <td class="table-success border-dark" style="min-width: 75px !important;">{{ data.max_p|floatformat:"1" }}</td>
-		  {%else%}
-		  <td class="table-danger border-dark" style="min-width: 75px !important;">{{ data.max_p|floatformat:"1" }}</td>
-		  {%endif%}
-      {% endfor %}
-    </tr>
-  {% endfor %}
-</tbody>
-</table>
-</div>
 </div>
 </br>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script>
+$(document).ready(function() {
+    $('#designForm').on('submit', function(e) {
+        e.preventDefault(); // Prevent the form from submitting the traditional way
+
+        $.ajax({
+            type: 'POST',
+            url: $(this).attr('action'),
+            data: $(this).serialize(),
+            success: function(response) {
+                $('#flangeTableContainer').html(response.table_html);
+            },
+            error: function(xhr, errmsg, err) {
+                console.log(xhr.status + ": " + xhr.responseText);
+            }
+        });
+    });
+});
+</script>
+
 {% endblock %}
