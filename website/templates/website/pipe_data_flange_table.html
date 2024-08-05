@@ -1,3 +1,5 @@
+{%if organised_flange_data%}
+<p>Showing Maximum Design Pressure for Design Temperature of {{DT}}°C</p>
 <table id="pipe_data_flange" class="table table-hover table-bordered border-dark">
     <thead>
         <tr>
@@ -31,10 +33,13 @@
 <table class="table table-hover table-bordered border-dark" style="width: auto">
 <tbody>    
     <tr>
-        <td class="table-success border-dark"><strong>Acceptable</strong></td>
+        <td class="table-success border-dark"><strong>Acceptable for {{DP}} bar</strong></td>
     </tr>
     <tr>
-        <td class="table-danger border-dark"><strong>Not Acceptable</strong></td>
+        <td class="table-danger border-dark"><strong>Not Acceptable for {{DP}} bar</strong></td>
     </tr>
 </tbody>
 </table>
+{%else%}
+<p>Please enter a valid temperature between -29 and xxx°C and a valid presssure between 0 and xxx barg</p>
+{%endif%}
